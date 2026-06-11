@@ -5,6 +5,10 @@
 import sys
 import os
 
+# 【关键】强制 Qt 使用 Windows Media Foundation 后端
+# WMF 在 Windows 10/11 中自带 FLAC/AAC 等解码器支持
+os.environ['QT_MULTIMEDIA_PREFERRED_PLUGINS'] = 'windowsmediafoundation'
+
 # 添加src目录到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 

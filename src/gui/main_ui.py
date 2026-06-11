@@ -7,6 +7,7 @@ import json
 import sys
 from src.player import MusicPlayer
 from src.audio_utils import get_audio_metadata
+from src import lyrics_service
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QStatusBar, QSplitter,
                              QLabel)  # 添加 QLabel 导入
@@ -22,6 +23,7 @@ AUDIO_EXTENSIONS = {'.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.a
 try:
     from .ui_widget import PlaylistWidget
     from .ui_controls import PlayerControls
+    from .lyrics_widget import LyricsWidget
 except ImportError:
     # 定义空类作为占位符
     class PlaylistWidget(QWidget):
@@ -33,6 +35,11 @@ except ImportError:
         def __init__(self, parent=None):
             super().__init__(parent)
             self.setMinimumHeight(80)
+
+    class LyricsWidget(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setMinimumWidth(400)
 
 class MainWindow(QMainWindow):
     """主窗口类"""
@@ -96,17 +103,10 @@ class MainWindow(QMainWindow):
         self.playlist_widget = PlaylistWidget()
         self.splitter.addWidget(self.playlist_widget)
         
-        # 右侧：暂时留空（未来可能放专辑封面等）
-        self.right_panel = QWidget()
-        self.right_panel.setMinimumWidth(400)
-        self.splitter.addWidget(self.right_panel)
-        
-        # 给右侧面板添加一些临时内容，方便看到比例效果
-        right_layout = QVBoxLayout(self.right_panel)
-        right_label = QLabel("内容区域")
-        right_label.setAlignment(Qt.AlignCenter)
-        right_label.setStyleSheet("font-size: 20px; color: gray;")
-        right_layout.addWidget(right_label)
+        # 右侧：歌词显示区域
+        self.lyrics_widget = LyricsWidget()
+        self.lyrics_widget.setMinimumWidth(400)
+        self.splitter.addWidget(self.lyrics_widget)
 
         
         # 设置分割器初始比例（左:右 = 1:4）
@@ -256,6 +256,8 @@ class MainWindow(QMainWindow):
             self.status_label.setText("播放列表已清空")
             # 停止播放
             self.player.stop()              
+            # 清空歌词显示
+            self.lyrics_widget.clear_lyrics()
             
 # 播放/暂停回调      
     def on_play_pause(self):
@@ -393,6 +395,7 @@ class MainWindow(QMainWindow):
     def _connect_player_signals(self):
         """连接播放器的信号到UI"""
         self.player.position_changed.connect(self.controls.update_position)
+        self.player.position_changed.connect(self.lyrics_widget.update_position)
         self.player.state_changed.connect(self.controls.update_play_state)
         self.player.volume_changed.connect(self.controls.update_volume)
         self.player.media_changed.connect(self.on_media_changed)
@@ -417,6 +420,10 @@ class MainWindow(QMainWindow):
         self.player.playlist_current_index_changed.connect(self.on_player_index_changed) # 同步UI选中状态
         self.playlist_widget.item_double_clicked.connect(self.on_playlist_double_clicked) # 双击播放事件
         self.playlist_widget.clear_requested.connect(self.on_clear_playlist) # 连接清空播放列表信号
+
+        # 歌词组件
+        self.lyrics_widget.ai_extract_clicked.connect(self._on_ai_extract_lyrics)
+        self.lyrics_widget.save_lyrics_clicked.connect(self._on_save_lyrics)
 
         # 清空菜单已经连接了 on_clear_playlist，但还需要清空播放器列表
         # 可以在 on_clear_playlist 中调用 player.clear_playlist() (已调用)    
@@ -451,6 +458,11 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"正在播放: {title} - {artist}")
         # 可以设置窗口标题等
         self.setWindowTitle(f"{title} - 音乐播放器")
+        
+        # 更新歌词组件的歌曲信息
+        self.lyrics_widget.set_song_info(title, artist)
+        # 触发歌词更新（预留接口）
+        self.update_lyrics(title, artist)
 
 # 播放列表索引变化事件：同步UI选中状态
     def on_playlist_index_changed(self, index):
@@ -498,7 +510,101 @@ class MainWindow(QMainWindow):
             self.playlist_widget.set_current_index(index)
         else:
             self.status_label.setText("就绪")
-        
+            # 播放停止时清空歌词显示
+            self.lyrics_widget.clear_lyrics()
+
+# 根据歌曲信息更新歌词显示
+    def update_lyrics(self, title: str, artist: str):
+        """根据歌曲信息更新歌词显示
+
+        逻辑顺序：
+        1. 先尝试读取音频文件内置歌词
+        2. 再尝试读取项目本地 lyrics 文件夹缓存
+        3. 无本地歌词则尝试网易云 API
+        4. API 获取成功后显示保存按钮
+
+        Args:
+            title: 歌曲标题
+            artist: 歌手名称
+        """
+        file_path = self.player.get_current_media_path()
+
+        # 1. 先尝试读取内置歌词
+        if file_path:
+            embedded_lyrics = lyrics_service.get_embedded_lyrics(file_path)
+            if embedded_lyrics and embedded_lyrics.strip():
+                self.lyrics_widget.set_lyrics(embedded_lyrics)
+                self.lyrics_widget.hide_save_button()
+                return
+
+        # 2. 尝试读取项目本地缓存歌词
+        local_lyrics = lyrics_service.get_local_lyrics(title, artist)
+        if local_lyrics and local_lyrics.strip():
+            self.lyrics_widget.set_lyrics(local_lyrics)
+            self.lyrics_widget.hide_save_button()
+            return
+
+        # 3. 没有本地歌词，显示提示并尝试网易云 API
+        self.lyrics_widget.set_lyrics("未检测到有效歌词\n\n正在尝试从网易云音乐获取...")
+        self.lyrics_widget.hide_save_button()
+
+        # 延迟执行 API 请求，避免阻塞 UI
+        QTimer.singleShot(100, lambda: self._fetch_netease_lyrics(title, artist, file_path))
+
+    def _fetch_netease_lyrics(self, title: str, artist: str, file_path: str):
+        """异步获取网易云歌词并更新显示"""
+        try:
+            lyrics = lyrics_service.fetch_lyrics_from_netease(title, artist)
+            if lyrics and lyrics.strip():
+                self.lyrics_widget.set_lyrics(lyrics)
+                self.lyrics_widget.show_save_button()
+                # 缓存待保存的信息（改为按标题/歌手）
+                self._pending_lyrics_title = title
+                self._pending_lyrics_artist = artist
+                self._pending_lyrics_text = lyrics
+            else:
+                self.lyrics_widget.set_lyrics(
+                    "未检测到有效歌词\n\n网易云音乐也未找到匹配歌词。"
+                )
+                self.lyrics_widget.hide_save_button()
+        except Exception as e:
+            self.lyrics_widget.set_lyrics(
+                f"未检测到有效歌词\n\n获取歌词失败: {e}"
+            )
+            self.lyrics_widget.hide_save_button()
+
+    def _on_ai_extract_lyrics(self):
+        """AI 提取歌词按钮点击（功能留空）"""
+        QMessageBox.information(
+            self, "AI提取歌词",
+            "AI 歌词提取功能正在开发中，敬请期待！"
+        )
+
+    def _on_save_lyrics(self):
+        """保存歌词按钮点击"""
+        if (hasattr(self, '_pending_lyrics_title') and
+            hasattr(self, '_pending_lyrics_artist') and
+            hasattr(self, '_pending_lyrics_text')):
+            success = lyrics_service.save_lyrics_to_file(
+                self._pending_lyrics_title,
+                self._pending_lyrics_artist,
+                self._pending_lyrics_text
+            )
+            if success:
+                QMessageBox.information(
+                    self, "保存成功",
+                    f"歌词已保存到项目 lyrics 文件夹\n"
+                    f"({lyrics_service.LYRICS_DIR})"
+                )
+                self.lyrics_widget.hide_save_button()
+            else:
+                QMessageBox.warning(
+                    self, "保存失败",
+                    "歌词保存失败，请检查目录权限"
+                )
+        else:
+            QMessageBox.warning(self, "保存失败", "没有可保存的歌词内容")
+
 
 
 

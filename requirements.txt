@@ -1,3 +1,4 @@
 PyQt5>=5.15.0
 pygame>=2.0.0  # 备用音频引擎
 mutagen>=1.45.0
+requests>=2.28.0

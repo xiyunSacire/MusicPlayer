@@ -149,10 +149,10 @@ class MusicPlayer(QObject):
             # 这里我们通过自定义方式在外部设置元数据
             pass
 
-    def _on_player_error(self, error, error_string):
+    def _on_player_error(self, error):
         """播放器错误"""
         if error != QMediaPlayer.NoError:
-            self.error_occurred.emit(error_string)
+            self.error_occurred.emit(self.player.errorString())
 
     def _on_playlist_index_changed(self, index):
         """播放列表当前索引变化"""
