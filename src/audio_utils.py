@@ -29,9 +29,22 @@ def get_audio_metadata(file_path):
                 metadata['artist'] = audio['artist'][0]
             # 时长
             if audio.info and hasattr(audio.info, 'length'):
-                metadata['duration'] = int(audio.info.length)
+                metadata['duration'] = int(audio.info.length)            
+    
     except Exception as e:
         print(f"读取元数据失败: {file_path} - {e}")
+        
+    # --- 优化点：如果标签作者为空，则尝试从文件名解析 ---
+    if metadata['artist'] == '未知艺术家' and metadata['title'] != os.path.basename(file_path):
+        base_name = os.path.splitext(metadata['title'])[0]
+        # 查找第一个 '-' 分隔符，假设作者在它前面
+        if '-' in base_name:
+            parts = base_name.split('-', 1)
+            # 假设作者是第一个部分，并清理可能的空格
+            potential_artist = parts[0].strip()
+            if potential_artist:
+                metadata['artist'] = potential_artist
+    # ----------------------------------------------------
     
     return metadata
 

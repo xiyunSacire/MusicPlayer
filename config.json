@@ -1,13 +1,13 @@
 {
   "window": {
-    "width": 1791,
-    "height": 1031,
+    "width": 1833,
+    "height": 1100,
     "maximized": false,
-    "x": 380,
-    "y": 115
+    "x": 307,
+    "y": 99
   },
   "player": {
-    "volume": 60,
+    "volume": 40,
     "shuffle": false,
     "repeat": "none"
   },

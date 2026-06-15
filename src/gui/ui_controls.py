@@ -1,9 +1,11 @@
 """
 播放控制面板
 """
+import os
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, 
                              QSlider, QLabel, QVBoxLayout)
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtGui import QIcon, QPixmap
 
 class PlayerControls(QWidget):
     """播放控制面板"""
@@ -46,34 +48,65 @@ class PlayerControls(QWidget):
         # 控制按钮布局
         controls_layout = QHBoxLayout()
         
+        # 左侧弹性空间
+        controls_layout.addStretch(4)
+        
         # 上一首按钮
-        self.prev_btn = QPushButton("◀◀")
-        self.prev_btn.setFixedSize(40, 40)
+        self.prev_btn = QPushButton()
+        icon_path1 = os.path.join(os.path.dirname(__file__), "..", "resources", "icons", "Left.png")
+        self.prev_btn.setIcon(QIcon(icon_path1))
+        self.prev_btn.setIconSize(QSize(150, 150))  # 图标铺满按钮
+        self.prev_btn.setFixedSize(150, 100)
         self.prev_btn.setEnabled(True)  # 启用按钮
+        self.prev_btn.setStyleSheet("""
+              QPushButton {
+              border: none;
+              background: transparent;
+              padding: 0px;
+              }
+              QPushButton::icon {
+              width: 110px;
+              height: 75px;
+              }
+            """)        
         self.prev_btn.clicked.connect(self.on_prev_clicked)  # 连接信号
         controls_layout.addWidget(self.prev_btn)
 
         # 播放/暂停按钮
         self.play_btn = QPushButton("▶")
-        self.play_btn.setFixedSize(50, 50)
+        self.play_btn.setFixedSize(70, 55)
         self.play_btn.setEnabled(True)  # 启用按钮
         self.play_btn.clicked.connect(self.on_play_pause_clicked)  # 连接信号
         controls_layout.addWidget(self.play_btn)
 
         # 下一首按钮
-        self.next_btn = QPushButton("▶▶")
-        self.next_btn.setFixedSize(40, 40)
+        self.next_btn = QPushButton()
+        icon_path2 = os.path.join(os.path.dirname(__file__), "..", "resources", "icons", "Right.png")
+        self.next_btn.setIcon(QIcon(icon_path2))
+        self.next_btn.setIconSize(QSize(150, 150))  # 图标铺满按钮
+        self.next_btn.setFixedSize(150, 100)
         self.next_btn.setEnabled(True)  # 启用按钮
+        self.next_btn.setStyleSheet("""
+              QPushButton {
+              border: none;
+              background: transparent;
+              padding: 0px;
+              }
+              QPushButton::icon {
+              width: 110px;
+              height: 75px;
+              }
+            """)
         self.next_btn.clicked.connect(self.on_next_clicked)  # 连接信号
         controls_layout.addWidget(self.next_btn)
         
-        # 占位空间
-        controls_layout.addStretch(1)
+        # 中间弹性空间
+        controls_layout.addStretch(2)
         
         # 音量控制
         self.volume_label = QLabel("音量:")
         controls_layout.addWidget(self.volume_label)
-        
+
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(70)
@@ -82,10 +115,13 @@ class PlayerControls(QWidget):
         self.volume_slider.valueChanged.connect(self.on_volume_changed)  # 连接信号
         controls_layout.addWidget(self.volume_slider)
         
-        main_layout.addLayout(controls_layout)
+        main_layout.addLayout(controls_layout)  # 添加控制按钮布局
+        
+        # 右侧弹性空间：占总弹性空间的 1/5
+        controls_layout.addStretch(1)
         
         # 设置固定高度
-        self.setFixedHeight(120)
+        self.setFixedHeight(140)
         
   # ========== 槽函数（接收播放器信号更新UI） ==========
 

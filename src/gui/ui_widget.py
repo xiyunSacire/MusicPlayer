@@ -101,7 +101,6 @@ class PlaylistWidget(QWidget):
         self.playlist.setContextMenuPolicy(Qt.CustomContextMenu)
         self.playlist.customContextMenuRequested.connect(self.show_context_menu)
         # 添加到布局
-        main_layout.addLayout(title_layout)
         main_layout.addWidget(self.playlist)
     
     # ========== 槽函数 ==========
