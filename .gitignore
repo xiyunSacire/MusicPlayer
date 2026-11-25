@@ -23,3 +23,17 @@ Thumbs.db
 
 # 日志文件
 *.log
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 运行时配置（含本机路径，不入库）
+config.json
+
+# 调试与预览产物
+debug/
+editor_preview.png
+
+# 虚拟环境
+.venv/
+venv/
