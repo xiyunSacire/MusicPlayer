@@ -18,7 +18,7 @@ import os
 import re
 import time
 from PyQt5.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QApplication, QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QLineEdit, QFileDialog, QMessageBox, QSlider, QComboBox,
     QPlainTextEdit, QDialogButtonBox, QShortcut, QFrame
@@ -184,6 +184,10 @@ class LyricsEditorDialog(QDialog):
         self.player.stateChanged.connect(self._on_player_state_changed)
 
         self.setWindowTitle("LRC 歌词制作与微调工具")
+        # 与主窗口同属一个应用标识，补上图标避免任务栏合并按钮显示通用图标
+        app_icon = QApplication.windowIcon()
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
         self.resize(1160, 750)
         self.setMinimumSize(980, 620)
 

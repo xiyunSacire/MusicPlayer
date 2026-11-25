@@ -13,7 +13,7 @@
 
 from PyQt5.QtCore import QEasingCurve, Qt, QVariantAnimation, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter, QPainterPath, QPen
-from PyQt5.QtWidgets import QLabel, QMenu, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 
 
 class OutlinedLabel(QLabel):
@@ -94,6 +94,12 @@ class DesktopLyricsWindow(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.NoFocus)
+
+        # 悬浮窗与主窗口同属一个应用标识，任务栏会把它们合并成一个按钮；
+        # 若这个窗口没有图标，合并后的按钮就会显示通用窗口图标
+        app_icon = QApplication.windowIcon()
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
 
         self._lines = []
         self._current_index = -1

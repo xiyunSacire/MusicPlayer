@@ -21,26 +21,49 @@ APP_USER_MODEL_ID = "MusicPlayer.Desktop.1"
 APP_DISPLAY_NAME = "音乐播放器"
 
 
-def _set_windows_app_id():
-    """声明本进程的应用标识
+def _current_app_user_model_id():
+    """读取进程当前的 AppUserModelID（可能已被 Explorer 或本程序设置）"""
+    if sys.platform != 'win32':
+        return None
+    try:
+        import ctypes
+        buffer = ctypes.c_wchar_p()
+        hr = ctypes.windll.shell32.GetCurrentProcessExplicitAppUserModelID(
+            ctypes.byref(buffer))
+        if hr == 0 and buffer.value:
+            return buffer.value
+    except Exception:
+        pass
+    return None
 
-    Windows 任务栏按 AppUserModelID 归组并决定显示哪个图标。用 python.exe 启动时
-    不设置它，任务栏会把它当成 Python 进程。必须在创建任何窗口之前调用。
+
+def _ensure_app_user_model_id():
+    """确定本进程要用的 AppUserModelID，并返回它
+
+    从桌面快捷方式启动时，Explorer 会先给进程设一个"由快捷方式派生"的 ID，
+    我们自己的 ID 就设不进去了（SetCurrentProcessExplicitAppUserModelID 被忽略）。
+    所以这里先读现有 ID：有就用它（并针对它注册图标），没有才设成我们自己的。
     """
     if sys.platform != 'win32':
-        return
+        return None
+
+    existing = _current_app_user_model_id()
+    if existing:
+        return existing
+
     try:
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
     except Exception:
         pass
+    return APP_USER_MODEL_ID
 
 
-def _register_taskbar_icon(icon_path):
+def _register_taskbar_icon(icon_path, app_id=None):
     """把任务栏图标登记到 AppUserModelID 名下（仅写 HKCU，不需要管理员）
 
     只调用 setWindowIcon() 能改标题栏和 Alt-Tab 图标，但**任务栏**按钮用的是
-    AppUserModelID 关联的图标；不登记就会回退到 python.exe 的图标。
+    AppUserModelID 关联的图标；不登记就会显示成通用窗口图标。
     """
     if sys.platform != 'win32' or not icon_path:
         return False
@@ -49,7 +72,8 @@ def _register_taskbar_icon(icon_path):
     except Exception:
         return False
 
-    key_path = r"Software\Classes\AppUserModelId\%s" % APP_USER_MODEL_ID
+    app_id = app_id or APP_USER_MODEL_ID
+    key_path = r"Software\Classes\AppUserModelId\%s" % app_id
     try:
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as key:
             winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, APP_DISPLAY_NAME)
@@ -81,7 +105,8 @@ def _app_icon_path():
 def main():
     """程序主入口"""
     try:
-        _set_windows_app_id()
+        # 先确定应用标识（快捷方式启动时 Explorer 已经设过，就沿用它的）
+        app_id = _ensure_app_user_model_id()
 
         # 创建应用
         app = QApplication(sys.argv)
@@ -92,7 +117,8 @@ def main():
         icon_path = _app_icon_path()
         if os.path.exists(icon_path):
             app.setWindowIcon(QIcon(icon_path))
-            _register_taskbar_icon(icon_path)
+            # 任务栏图标按实际使用的 AppUserModelID 登记
+            _register_taskbar_icon(icon_path, app_id)
         else:
             print(f"[警告] 找不到应用图标: {icon_path}")
         
